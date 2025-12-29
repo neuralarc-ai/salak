@@ -5,7 +5,7 @@ import { getAuthenticatedUser, isAdmin, logAction, getClientIp } from '@/lib/aut
 // GET /documents/:id - Get a specific document
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await getAuthenticatedUser(request)
@@ -17,10 +17,9 @@ export async function GET(
       )
     }
 
-    const { id } = await params
     const supabase = createServerClient()
 
-    // Build query - filter by user to ensure users only see their own documents
+    // Build query
     let query = supabase
       .from('documents')
       .select(`
@@ -36,16 +35,15 @@ export async function GET(
           email
         )
       `)
-      .eq('id', id)
-      // CRITICAL: Filter by user to ensure users only see their own documents
-      .or(`user_id.eq.${user.id},uploaded_by.eq.${user.id}`)
+      .eq('id', params.id)
+      .single()
 
     // Non-admins can only see active documents
     if (user.role !== 'admin') {
       query = query.eq('status', 'active')
     }
 
-    const { data: document, error } = await query.single()
+    const { data: document, error } = await query
 
     if (error || !document) {
       return NextResponse.json(
@@ -70,7 +68,7 @@ export async function GET(
 // PUT /documents/:id - Update a document
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await getAuthenticatedUser(request)
@@ -82,16 +80,13 @@ export async function PUT(
       )
     }
 
-    const { id } = await params
     const supabase = createServerClient()
 
     // Check if document exists and user has permission
-    // Filter by user_id or uploaded_by to ensure users can only access their own documents
     const { data: existingDoc, error: fetchError } = await supabase
       .from('documents')
-      .select('user_id, uploaded_by, status')
-      .eq('id', id)
-      .or(`user_id.eq.${user.id},uploaded_by.eq.${user.id}`)
+      .select('uploaded_by, status')
+      .eq('id', params.id)
       .single()
 
     if (fetchError || !existingDoc) {
@@ -126,7 +121,7 @@ export async function PUT(
     const { data: document, error: updateError } = await supabase
       .from('documents')
       .update(updateData)
-      .eq('id', id)
+      .eq('id', params.id)
       .select(`
         *,
         categories:category_id (
@@ -144,14 +139,14 @@ export async function PUT(
 
     if (updateError || !document) {
       console.error('Update document error:', updateError)
-      await logAction(user.id, 'Document Update', `${id}`, 'failed', getClientIp(request))
+      await logAction(user.id, 'Document Update', `${params.id}`, 'failed', getClientIp(request))
       return NextResponse.json(
         { error: 'Failed to update document' },
         { status: 500 }
       )
     }
 
-    await logAction(user.id, 'Document Update', `${document.name} (${id})`, 'success', getClientIp(request))
+    await logAction(user.id, 'Document Update', `${document.name} (${params.id})`, 'success', getClientIp(request))
 
     return NextResponse.json({
       success: true,
@@ -169,7 +164,7 @@ export async function PUT(
 // DELETE /documents/:id - Delete a document
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const user = await getAuthenticatedUser(request)
@@ -181,16 +176,13 @@ export async function DELETE(
       )
     }
 
-    const { id } = await params
     const supabase = createServerClient()
 
     // Check if document exists and user has permission
-    // Filter by user_id or uploaded_by to ensure users can only access their own documents
     const { data: existingDoc, error: fetchError } = await supabase
       .from('documents')
-      .select('user_id, uploaded_by, name')
-      .eq('id', id)
-      .or(`user_id.eq.${user.id},uploaded_by.eq.${user.id}`)
+      .select('uploaded_by, name')
+      .eq('id', params.id)
       .single()
 
     if (fetchError || !existingDoc) {
@@ -200,9 +192,8 @@ export async function DELETE(
       )
     }
 
-    // Additional permission check: user can only delete their own documents, admins can delete any
-    const isOwner = existingDoc.user_id === user.id || existingDoc.uploaded_by === user.id
-    if (!isOwner && !isAdmin(user)) {
+    // Check permissions: user can only delete their own documents, admins can delete any
+    if (existingDoc.uploaded_by !== user.id && !isAdmin(user)) {
       return NextResponse.json(
         { error: 'Forbidden: You can only delete your own documents' },
         { status: 403 }
@@ -213,18 +204,18 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('documents')
       .update({ status: 'deleted' })
-      .eq('id', id)
+      .eq('id', params.id)
 
     if (deleteError) {
       console.error('Delete document error:', deleteError)
-      await logAction(user.id, 'Document Delete', `${id}`, 'failed', getClientIp(request))
+      await logAction(user.id, 'Document Delete', `${params.id}`, 'failed', getClientIp(request))
       return NextResponse.json(
         { error: 'Failed to delete document' },
         { status: 500 }
       )
     }
 
-    await logAction(user.id, 'Document Delete', `${existingDoc.name} (${id})`, 'success', getClientIp(request))
+    await logAction(user.id, 'Document Delete', `${existingDoc.name} (${params.id})`, 'success', getClientIp(request))
 
     return NextResponse.json({
       success: true,
