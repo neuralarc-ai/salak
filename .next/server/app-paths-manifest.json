@@ -1,0 +1,16 @@
+{
+  "/documents/page": "app/documents/page.js",
+  "/upload/page": "app/upload/page.js",
+  "/settings/api-keys/page": "app/settings/api-keys/page.js",
+  "/login/page": "app/login/page.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/documents/route": "app/api/documents/route.js",
+  "/api/categories/route": "app/api/categories/route.js",
+  "/api/documents/[id]/route": "app/api/documents/[id]/route.js",
+  "/categories/page": "app/categories/page.js",
+  "/admin/logs/page": "app/admin/logs/page.js",
+  "/api/admin/logs/route": "app/api/admin/logs/route.js"
+}
